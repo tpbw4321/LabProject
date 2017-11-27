@@ -97,7 +97,7 @@ void printScaleSettings(int xscale, int yscale, int xposition, int yposition, VG
 }
 
 // Convert waveform samples into screen coordinates
-void processSamples(int *data, // sample data
+void processSamples(char *data, // sample data
                     int nsamples, // Number of samples
                     int xstart, // starting x position of wave
                     int xfinish, // Ending x position of wave
@@ -179,8 +179,11 @@ int main(int argc, char **argv) {
         perror("Cannot claim interface");
     }
     
-    char adcData1[64]; // Channel1 data block
-    char adcData2[64]; // Receive data block
+#define PACKET_SIZE 64
+#define NUM_PACKETS 2
+    
+    char adcData1[PACKET_SIZE*NUM_PACKETS]; // Channel1 data block
+    char adcData2[PACKET_SIZE*NUM_PACKETS]; // Channel2 data block
     
     int width, height; // Width and height of screen in pixels
     int margin = 10; // Margin spacing around screen
@@ -223,51 +226,46 @@ int main(int argc, char **argv) {
     int rcvd_bytes;
     int potScaleFac = 0;
     
+    
     potScaleFac = height/256;
-
+    
     
     while(1){
-        
         //Endpoint 1
-        do{
-            return_val = libusb_bulk_transfer(dev,(0x01 | 0x80), adcData1, 64, &rcvd_bytes, 1000);
+        for(int i = 0; i < NUM_PACKETS; i++){
+            return_val = libusb_bulk_transfer(dev,(0x01 | 0x80), adcData1+(i*PACKET_SIZE), PACKET_SIZE, &rcvd_bytes, 1000);
             if(return_val != 0){
                 perror("Recieve 1");
+                return -1;
             }
-        }while(return_val != 0);
-        
-        
-        for(int i = 0; i < rcvd_bytes; i++){
-            channel1_data[i] = adcData1[i];
         }
         
         //Endpoint 2
-        do{
-            return_val = libusb_bulk_transfer(dev,(0x02 | 0x80), adcData2, 64, &rcvd_bytes, 1000);
-            if(return_val != 0){
-                perror("Recieve 2");
-            }
-        }while(return_val != 0);
-        
-        for(int i = 0; i < rcvd_bytes; i++){
-            channel2_data[i] = adcData2[i];
-        }
+         return_val = libusb_bulk_transfer(dev,(0x02 | 0x80), adcData2, PACKET_SIZE, &rcvd_bytes, 1000);
+         if(return_val != 0){
+         perror("Recieve 2");
+         return -1;
+         }
+         
+         
+         /*for(int i = 0; i < rcvd_bytes; i++){
+         channel2_data[i] = adcData2[i];
+         }*/
         
         return_val = libusb_interrupt_transfer(dev, (0x03| 0x80), potReading, 2, &rcvd_bytes, 1000);
         if(return_val != 0){
             perror("Recieve 3");
+            return -1;
         }
-        else{
-            printf("%d %d\n",potReading[0], potReading[1]);
-        }
-
+        
         
         Start(width, height);
         drawBackground(width, height, xdivisions, ydivisions, margin);
         printScaleSettings(xscale, yscale, width-300, height-50, textcolor);
-        processSamples(channel1_data, 64, margin, width-2*margin, pixels_per_volt, channel1_points);
-        processSamples(channel2_data, 64, margin, width-2*margin, pixels_per_volt, channel2_points);
-        plotWave(channel1_points, 64, margin+(potReading[0]*potScaleFac), wave1color);
+        processSamples(adcData1, NUM_PACKETS*PACKET_SIZE, margin, width-2*margin, pixels_per_volt, channel1_points);
+        processSamples(adcData2, 64, margin, width-2*margin, pixels_per_volt, channel2_points);
+        
+        plotWave(channel1_points, NUM_PACKETS*PACKET_SIZE, margin+(potReading[0]*potScaleFac), wave1color);
         plotWave(channel2_points, 64, margin+(potReading[1]*potScaleFac), wave2color);
         End();
         
