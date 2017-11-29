@@ -8,6 +8,11 @@
 #include <math.h>
 #include <errno.h>
 #include <libusb.h>
+#include "queue.h"
+
+#define PACKET_SIZE 128
+#define NUM_PACKETS 1
+#define SAMP_SIZE 64
 
 #define PI 3.14159265
 
@@ -97,7 +102,7 @@ void printScaleSettings(int xscale, int yscale, int xposition, int yposition, VG
 }
 
 // Convert waveform samples into screen coordinates
-void processSamples(char *data, // sample data
+void processSamples(queue *data, // sample data
                     int nsamples, // Number of samples
                     int xstart, // starting x position of wave
                     int xfinish, // Ending x position of wave
@@ -108,7 +113,7 @@ void processSamples(char *data, // sample data
     
     for (int i=0; i< nsamples; i++){
         x1 = xstart + (xfinish-xstart)*i/nsamples;
-        y1 = data[i] * 5 * yscale/256;
+        y1 = Dequeue(data) * 5 * yscale/256;
         p.x = x1;
         p.y = y1;
         point_array[i] = p;
@@ -142,14 +147,34 @@ void plotWave(data_point *data, // sample data
         y1 = y2;
     }
 }
+static unsigned char buffer[PACKET_SIZE];
+static struct libusb_transfer * iso = NULL;
+static libusb_device_handle * dev = NULL;
+static queue data;                          //queue handler
+static int check = 0;                       //isochronous completion check
+
+//Callback function for isochronous transfer
+static void LIBUSB_CALL ReadBufferData(struct libusb_transfer *transfer){
+    
+    struct libusb_iso_packet_descriptor *ipd = transfer->iso_packet_desc;
+    
+    if(ipd->status == LIBUSB_TRANSFER_COMPLETED){
+        printf("Compelted Transferred: %d\n", ipd->actual_length);
+        for(int i = 0; i < ipd->actual_length; i++){
+            Enqueue(&data, buffer[i]);
+        }
+    }
+    else{
+        perror("Failed");
+    }
+    *(int *)transfer->user_data = 1;
+}
 
 // main initializes the system and shows the picture.
 // Exit and clean up when you hit [RETURN].
 int main(int argc, char **argv) {
     
     //USB Setup
-    libusb_device_handle* dev; // Pointer to data structure representing USB device
-    
     libusb_init(NULL); // Initialize the LIBUSB library
     
     // Open the USB device (the Cypress device has
@@ -179,12 +204,27 @@ int main(int argc, char **argv) {
         perror("Cannot claim interface");
     }
     
-#define PACKET_SIZE 64
-#define NUM_PACKETS 2
+    //Allocate isochronous transfer
+    iso = libusb_alloc_transfer(1);
+    if(!iso){
+        return -1;
+    }
     
-    char adcData1[PACKET_SIZE*NUM_PACKETS]; // Channel1 data block
-    char adcData2[PACKET_SIZE*NUM_PACKETS]; // Channel2 data block
+    //Setup Isochronous transfer
+    libusb_fill_iso_transfer(
+                             iso,             //Transfer Handle
+                             dev,             //Device Handle
+                             (0x80|0x01),     //Incoming EndPoint
+                             buffer,          //Buffer
+                             PACKET_SIZE,             //Transfer Count
+                             1,               //Number of packets
+                             ReadBufferData,  //Callback Function
+                             &check,          //Data pointer
+                             1000);           //Timeout
     
+    //Setting packet length
+    libusb_set_iso_packet_lengths(iso, PACKET_SIZE);
+
     int width, height; // Width and height of screen in pixels
     int margin = 10; // Margin spacing around screen
     int xdivisions = 10; // Number of x-axis divisions
@@ -203,11 +243,6 @@ int main(int argc, char **argv) {
     data_point channel1_points[10000];
     data_point channel2_points[10000];
     
-    for(int i = 0; i < 10000; i++){
-        channel1_data[i] = 0;
-        channel2_data[i] = 128;
-    }
-    
     saveterm(); // Save current screen
     init(&width, &height); // Initialize display and get width and height
     //rawterm(); // Needed to receive control characters from keyboard, such as ESC
@@ -222,33 +257,50 @@ int main(int argc, char **argv) {
     
     int return_val;
     
-    
     int rcvd_bytes;
     int potScaleFac = 0;
     
+    int trigger = 128;
+    int triggerFlag = 0;
     
     potScaleFac = height/256;
     
     
     while(1){
         //Endpoint 1
-        for(int i = 0; i < NUM_PACKETS; i++){
-            return_val = libusb_bulk_transfer(dev,(0x01 | 0x80), adcData1+(i*PACKET_SIZE), PACKET_SIZE, &rcvd_bytes, 1000);
-            if(return_val != 0){
-                perror("Recieve 1");
-                return -1;
-            }
+        if(libusb_submit_transfer(iso) != 0){
+            perror("Submit");
         }
+        while (!check)
+            libusb_handle_events_completed(NULL, NULL);
+        if(check)
+            check = 0;
         
+        /*for(int i = 0; i < NUM_PACKETS; i++){
+         return_val = libusb_bulk_transfer(dev,(0x01 | 0x80), adcData1+(i*PACKET_SIZE), PACKET_SIZE, &rcvd_bytes, 0);
+         if(return_val != 0){
+         perror("Recieve 1");
+         return -1;
+         }
+         }*/
+        
+        /*if (return_val == 0){
+         printf("%d bytes sent\n", rcvd_bytes);
+         for (int i=0; i<rcvd_bytes; i++){
+         printf("%02x ", adcData1[i]);
+         if (i % 16 == 15) printf("\n");
+         }
+         printf("\n");
+         }*/
         //Endpoint 2
-         return_val = libusb_bulk_transfer(dev,(0x02 | 0x80), adcData2, PACKET_SIZE, &rcvd_bytes, 1000);
+        /*return_val = libusb_bulk_transfer(dev,(0x02 | 0x80), adcData2, PACKET_SIZE, &rcvd_bytes, 1000);
          if(return_val != 0){
          perror("Recieve 2");
          return -1;
-         }
-         
-         
-         /*for(int i = 0; i < rcvd_bytes; i++){
+         }*/
+        
+        
+        /*for(int i = 0; i < rcvd_bytes; i++){
          channel2_data[i] = adcData2[i];
          }*/
         
@@ -259,16 +311,19 @@ int main(int argc, char **argv) {
         }
         
         
+        if(data.count > SAMP_SIZE){
         Start(width, height);
         drawBackground(width, height, xdivisions, ydivisions, margin);
         printScaleSettings(xscale, yscale, width-300, height-50, textcolor);
-        processSamples(adcData1, NUM_PACKETS*PACKET_SIZE, margin, width-2*margin, pixels_per_volt, channel1_points);
-        processSamples(adcData2, 64, margin, width-2*margin, pixels_per_volt, channel2_points);
         
-        plotWave(channel1_points, NUM_PACKETS*PACKET_SIZE, margin+(potReading[0]*potScaleFac), wave1color);
-        plotWave(channel2_points, 64, margin+(potReading[1]*potScaleFac), wave2color);
+        processSamples(&data, SAMP_SIZE, margin, width-2*margin, pixels_per_volt, channel1_points);
+        //processSamples(adcData2, 64, margin, width-2*margin, pixels_per_volt, channel2_points);
+        
+        plotWave(channel1_points, SAMP_SIZE, margin+(potReading[0]*potScaleFac), wave1color);
+        //plotWave(channel2_points, 64, margin+(potReading[1]*potScaleFac), wave2color);
+        
         End();
-        
+        }
     }
     
     
