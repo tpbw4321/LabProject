@@ -4,7 +4,7 @@
 //Initializes Queue
 
 typedef struct node{
-    char item;
+    void * item;
     struct node * prev;
     struct node * next;
     
@@ -17,10 +17,10 @@ typedef struct queue{
 }queue;
 
 //Inserts Item to back of the queue
-void Enqueue(queue * q, char item);
+void Enqueue(queue * q, void * item);
 
 //Removed an item from the head of the queue
-char Dequeue(queue * q);
+void * Dequeue(queue * q);
 
 //Finds the tail of the queue
 node * GetTail(node * queueItem);

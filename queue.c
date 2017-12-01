@@ -29,7 +29,7 @@ node * GetHead(node * queueItem){
 }
 
 //Inserts Item to back of the queue
-void Enqueue(queue * q, char item){
+void Enqueue(queue * q, void * item){
     
     if( q->head == NULL){
         q->head = (node *)malloc(sizeof(node));
@@ -52,8 +52,8 @@ void Enqueue(queue * q, char item){
 }
 
 //Removes an Item from the head of the queue
-char Dequeue(queue * q){
-    char item;
+void * Dequeue(queue * q){
+    void * item;
     node * old;
     
     old = q->head;
@@ -62,6 +62,7 @@ char Dequeue(queue * q){
     q->count--;
     old->next = NULL;
     old->prev = NULL;
+    //free(old->item);
     free(old);
     
     

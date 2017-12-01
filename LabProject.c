@@ -10,42 +10,30 @@
 #include <libusb.h>
 #include "queue.h"
 
-#define PACKET_SIZE 128
-#define NUM_PACKETS 1
-#define SAMP_SIZE 64
+#define PACKET_SIZE 1000
+#define SAMP_SIZE   100
+#define BUFFER_SIZE 2000
+#define SAMPLE_RATE 100000
 
 #define PI 3.14159265
+#define EP1 (0x80|0x01)
+#define EP2 (0x80|0x02)
+#define EP3 (0x80|0x03)
+static unsigned char buffer[PACKET_SIZE];   //Transfer Buffer
+static struct libusb_transfer * iso = NULL; //Isochronous Transfer Handler
+static libusb_device_handle * dev = NULL;   //USB Device Handler
+static queue rawData;                       //Data from PSOC
+static queue processedData;                 //Data converted data_points
+static int check = 0;                       //isochronous completion check
+static int posTrigger = 1;                 //Flag for tigger 0 NEG 1 POS
+static int trigger = 0;
+static int trigFlag = 0;
+static int freeRun = 1;
+static int yScaleDivsor = 64;
 
 typedef struct{
     VGfloat x, y;
 } data_point;
-
-
-// Square wave generator for demo
-void sineWave(int period, // period in us
-              int sampleInterval, // Samping interval in us
-              int samples, // total samples
-              int *data){
-    double rad, f;
-    for (int i=0; i<samples; i++){
-        if ((i *sampleInterval) % period < period/2)
-            data[i] = 0;
-        else
-            data[i] = 255;
-    }
-}
-
-// wait for a specific key pressed
-void waituntil(int endchar) {
-    int key;
-    
-    for (;;) {
-        key = getchar();
-        if (key == endchar || key == '\n') {
-            break;
-        }
-    }
-}
 
 
 // Draw grid lines
@@ -102,66 +90,104 @@ void printScaleSettings(int xscale, int yscale, int xposition, int yposition, VG
 }
 
 // Convert waveform samples into screen coordinates
-void processSamples(queue *data, // sample data
-                    int nsamples, // Number of samples
-                    int xstart, // starting x position of wave
-                    int xfinish, // Ending x position of wave
-                    float yscale, // y scale in pixels per volt
-                    data_point *point_array){
+void processSamples(queue *rawData,  // sample data
+                    int nsamples,    // Number of samples
+                    int xstart,      // starting x position of wave
+                    int xfinish,     // Ending x position of wave
+                    float yscale,    // y scale in pixels per volt
+                    queue *processedData){
     VGfloat x1, y1;
-    data_point p;
+    data_point * p;
+    char * data;
     
     for (int i=0; i< nsamples; i++){
+        data = (char*)Dequeue(rawData);
+        p = (data_point *) malloc(sizeof(data_point));
         x1 = xstart + (xfinish-xstart)*i/nsamples;
-        y1 = Dequeue(data) * 5 * yscale/256;
-        p.x = x1;
-        p.y = y1;
-        point_array[i] = p;
+        y1 = *data * 5 * yscale/yScaleDivsor;
+        p->x = x1;
+        p->y = y1;
+        free(data);
+        Enqueue(processedData, p);
+        
     }
 }
 
 
 // Plot waveform
-void plotWave(data_point *data, // sample data
+void plotWave(queue *processedData, // sample data
               int nsamples, // Number of samples
               int yoffset, // y offset from bottom of screen
               VGfloat linecolor[4] // Color for the wave
 ){
     
-    data_point p;
+    data_point * p;
     VGfloat x1, y1, x2, y2;
     
     Stroke(linecolor[0], linecolor[1], linecolor[2], linecolor[3]);
     StrokeWidth(4);
     
-    p = data[0];
-    x1 = p.x;
-    y1 = p.y + yoffset;
-    
-    for (int i=1; i< nsamples; i++){
-        p = data[i];
-        x2 = p.x;
-        y2 = p.y + yoffset;
+    p = (data_point*)Dequeue(processedData);
+    x1 = p->x;
+    y1 = p->y + yoffset;
+    free(p);
+    for(int i=1; i< nsamples; i++){
+        p = (data_point*)Dequeue(processedData);
+        x2 = p->x;
+        y2 = p->y + yoffset;
+        free(p);
         Line(x1, y1, x2, y2);
         x1 = x2;
         y1 = y2;
     }
 }
-static unsigned char buffer[PACKET_SIZE];
-static struct libusb_transfer * iso = NULL;
-static libusb_device_handle * dev = NULL;
-static queue data;                          //queue handler
-static int check = 0;                       //isochronous completion check
+int FindTrigger(){
+    char current = NULL;
+    char previous = NULL;
+    char * data;
+    
+    previous = *(char *) rawData.head->item;
+    
+    while(rawData.count > 0){
+        if(rawData.head->prev){
+            current  = *(char *) rawData.head->prev->item;
+            if(posTrigger){
+                if(previous < trigger && current > trigger){
+                    return 1;
+                }else{
+                    data = Dequeue(&rawData);
+                    free(data);
+                    previous = current;
+                }
+            }else{
+                if(previous > trigger && current < trigger){
+                    return 1;
+                }else{
+                    data = Dequeue(&rawData);
+                    free(data);
+                    previous = current;
+                }
+            }
+        }
+        else{
+            break;
+        }
+    }
+    return 0;
+}
 
 //Callback function for isochronous transfer
 static void LIBUSB_CALL ReadBufferData(struct libusb_transfer *transfer){
-    
+    static unsigned int count = 0;
     struct libusb_iso_packet_descriptor *ipd = transfer->iso_packet_desc;
+    char * item;
     
     if(ipd->status == LIBUSB_TRANSFER_COMPLETED){
-        printf("Compelted Transferred: %d\n", ipd->actual_length);
+       //printf("Completed Transfer: %d \n", ipd->actual_length);
         for(int i = 0; i < ipd->actual_length; i++){
-            Enqueue(&data, buffer[i]);
+            item = (char*)malloc(sizeof(char));
+            *item = buffer[i];
+            Enqueue(&rawData, item);
         }
     }
     else{
@@ -214,9 +240,9 @@ int main(int argc, char **argv) {
     libusb_fill_iso_transfer(
                              iso,             //Transfer Handle
                              dev,             //Device Handle
-                             (0x80|0x01),     //Incoming EndPoint
+                             EP1,             //Incoming EndPoint
                              buffer,          //Buffer
-                             PACKET_SIZE,             //Transfer Count
+                             PACKET_SIZE,     //Transfer Count
                              1,               //Number of packets
                              ReadBufferData,  //Callback Function
                              &check,          //Data pointer
@@ -224,7 +250,7 @@ int main(int argc, char **argv) {
     
     //Setting packet length
     libusb_set_iso_packet_lengths(iso, PACKET_SIZE);
-
+    
     int width, height; // Width and height of screen in pixels
     int margin = 10; // Margin spacing around screen
     int xdivisions = 10; // Number of x-axis divisions
@@ -237,15 +263,8 @@ int main(int argc, char **argv) {
     VGfloat wave1color[4] = {240, 0, 0, 0.5}; // Color for displaying Channel 1 data
     VGfloat wave2color[4] = {200, 200, 0, 0.5}; // Color for displaying Channel 2 data
     
-    int channel1_data[10000]; // Data samples from Channel 1
-    int channel2_data[10000]; // Data samples from Channel 2
-    
-    data_point channel1_points[10000];
-    data_point channel2_points[10000];
-    
     saveterm(); // Save current screen
     init(&width, &height); // Initialize display and get width and height
-    //rawterm(); // Needed to receive control characters from keyboard, such as ESC
     
     int xstart = margin;
     int xlimit = width - 2*margin;
@@ -259,78 +278,59 @@ int main(int argc, char **argv) {
     
     int rcvd_bytes;
     int potScaleFac = 0;
-    
-    int trigger = 128;
-    int triggerFlag = 0;
+    int buffLoad = 0;
     
     potScaleFac = height/256;
-    
-    
+    int count = 0;
+    trigger = 128;
+    printf("Max Packet Size: %d\n", libusb_get_max_iso_packet_size(libusb_get_device(dev), EP1));
     while(1){
         //Endpoint 1
         if(libusb_submit_transfer(iso) != 0){
             perror("Submit");
+            return -1;
         }
         while (!check)
             libusb_handle_events_completed(NULL, NULL);
-        if(check)
+        if(check){
             check = 0;
-        
-        /*for(int i = 0; i < NUM_PACKETS; i++){
-         return_val = libusb_bulk_transfer(dev,(0x01 | 0x80), adcData1+(i*PACKET_SIZE), PACKET_SIZE, &rcvd_bytes, 0);
-         if(return_val != 0){
-         perror("Recieve 1");
-         return -1;
-         }
-         }*/
-        
-        /*if (return_val == 0){
-         printf("%d bytes sent\n", rcvd_bytes);
-         for (int i=0; i<rcvd_bytes; i++){
-         printf("%02x ", adcData1[i]);
-         if (i % 16 == 15) printf("\n");
-         }
-         printf("\n");
-         }*/
-        //Endpoint 2
-        /*return_val = libusb_bulk_transfer(dev,(0x02 | 0x80), adcData2, PACKET_SIZE, &rcvd_bytes, 1000);
-         if(return_val != 0){
-         perror("Recieve 2");
-         return -1;
-         }*/
+            if(!trigFlag && !freeRun){
+                if(FindTrigger()){
+                    trigFlag = 1;
+                    printf("Trigger Count: %d", ++count);
+                }
+            }
+        }
         
         
-        /*for(int i = 0; i < rcvd_bytes; i++){
-         channel2_data[i] = adcData2[i];
-         }*/
-        
-        return_val = libusb_interrupt_transfer(dev, (0x03| 0x80), potReading, 2, &rcvd_bytes, 1000);
+        return_val = libusb_interrupt_transfer(dev, (0x03| 0x80), potReading, 2, &rcvd_bytes, 0);
         if(return_val != 0){
             perror("Recieve 3");
             return -1;
         }
         
         
-        if(data.count > SAMP_SIZE){
         Start(width, height);
         drawBackground(width, height, xdivisions, ydivisions, margin);
         printScaleSettings(xscale, yscale, width-300, height-50, textcolor);
         
-        processSamples(&data, SAMP_SIZE, margin, width-2*margin, pixels_per_volt, channel1_points);
-        //processSamples(adcData2, 64, margin, width-2*margin, pixels_per_volt, channel2_points);
-        
-        plotWave(channel1_points, SAMP_SIZE, margin+(potReading[0]*potScaleFac), wave1color);
-        //plotWave(channel2_points, 64, margin+(potReading[1]*potScaleFac), wave2color);
-        
-        End();
+        if(rawData.count > BUFFER_SIZE){
+            buffLoad = 1;
         }
+        
+        if(rawData.count >= SAMP_SIZE && buffLoad){
+            if(trigFlag || freeRun){
+                processSamples(&rawData, SAMP_SIZE, margin, width, pixels_per_volt, &processedData);
+                plotWave(&processedData, SAMP_SIZE, margin+(potReading[0]*potScaleFac), wave1color);
+                trigFlag = 0;
+            }
+        }else{
+            buffLoad = 0;
+        }
+        End();
+        
     }
     
-    
-    
-    
-    
-    waituntil(0x1b); // Wait for user to press ESC or RET key
     
     restoreterm();
     finish();
