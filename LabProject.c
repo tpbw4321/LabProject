@@ -10,8 +10,8 @@
 #include <libusb.h>
 #include "queue.h"
 
-#define PACKET_SIZE 1000
-#define SAMP_SIZE   100
+#define PACKET_SIZE 500
+#define SAMP_SIZE   80
 #define BUFFER_SIZE 2000
 #define SAMPLE_RATE 100000
 
@@ -29,7 +29,7 @@ static int posTrigger = 1;                 //Flag for tigger 0 NEG 1 POS
 static int trigger = 0;
 static int trigFlag = 0;
 static int freeRun = 1;
-static int yScaleDivsor = 64;
+static int yScaleDivsor = 640;
 
 typedef struct{
     VGfloat x, y;
@@ -104,7 +104,7 @@ void processSamples(queue *rawData,  // sample data
         data = (char*)Dequeue(rawData);
         p = (data_point *) malloc(sizeof(data_point));
         x1 = xstart + (xfinish-xstart)*i/nsamples;
-        y1 = *data * 5 * yscale/yScaleDivsor;
+        y1 = *data * 5 * yscale * 5/yScaleDivsor;
         p->x = x1;
         p->y = y1;
         free(data);
