@@ -14,7 +14,6 @@
 #define PACKET_SIZE 500
 #define SAMP_SIZE   100
 #define BUFFER_SIZE 2000
-#define SAMPLE_RATE 100000
 
 #define PI 3.14159265
 #define EP1 (0x80|0x01)

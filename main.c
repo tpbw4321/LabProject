@@ -6,12 +6,27 @@
 //  Copyright © 2017 libusb. All rights reserved.
 //
 
+
 #include <stdio.h>
 #include <stdlib.h>
+#include "queue.h"
 #include "libusb.h"
+#include "usbcomm.h"
+#include 
+
+#define EP1 (0x80|0x01)
+#define EP2 (0x80|0x02)
+#define EP3 (0x80|0x03)
+#define EP4 (0x00|0x04)
+#define PACKET_SIZE 500                     //Ischronous Packet Size
+
 
 static struct libusb_transfer * iso = NULL; //Isochronous Transfer Handler
 static libusb_device_handle * dev = NULL;   //USB Device Handler
+static unsigned char buffer[PACKET_SIZE];   //Transfer Buffer
+static queue rawData;                       //Data from PSOC
+static queue processedData;                 //Data converted data_points
+
 
 //Callback function for isochronous transfer
 static void LIBUSB_CALL ReadBufferData(struct libusb_transfer *transfer){
@@ -35,6 +50,8 @@ static void LIBUSB_CALL ReadBufferData(struct libusb_transfer *transfer){
 }
 
 int main(int argc, char **argv) {
+    
+    
     
 }
 
