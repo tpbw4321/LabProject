@@ -8,6 +8,7 @@
 #include <math.h>
 #include <errno.h>
 #include <libusb.h>
+#include "usbcomm.h"
 #include "queue.h"
 
 #define PACKET_SIZE 500
@@ -183,7 +184,7 @@ static void LIBUSB_CALL ReadBufferData(struct libusb_transfer *transfer){
     char * item;
     
     if(ipd->status == LIBUSB_TRANSFER_COMPLETED){
-       //printf("Completed Transfer: %d \n", ipd->actual_length);
+        *(int *)transfer->user_data = ipd->actual_length;
         for(int i = 0; i < ipd->actual_length; i++){
             item = (char*)malloc(sizeof(char));
             *item = buffer[i];
@@ -193,63 +194,20 @@ static void LIBUSB_CALL ReadBufferData(struct libusb_transfer *transfer){
     else{
         perror("Failed");
     }
-    *(int *)transfer->user_data = 1;
 }
 
 // main initializes the system and shows the picture.
 // Exit and clean up when you hit [RETURN].
 int main(int argc, char **argv) {
     
-    //USB Setup
-    libusb_init(NULL); // Initialize the LIBUSB library
-    
     // Open the USB device (the Cypress device has
     // Vendor ID = 0x04B4 and Product ID = 0x8051)
-    dev = libusb_open_device_with_vid_pid(NULL, 0x04B4, 0x8051);
+    dev = SetupDevHandle(0x04B4, 0x8051);
     
-    if (dev == NULL){
-        perror("device not found\n");
-    }
-    
-    // Reset the USB device.
-    // This step is not always needed, but clears any residual state from
-    // previous invocations of the program.
-    if (libusb_reset_device(dev) != 0){
-        perror("Device reset failed\n");
-    }
-    
-    // Set configuration of USB device
-    if (libusb_set_configuration(dev, 1) != 0){
-        perror("Set configuration failed\n");
-    }
-    
-    
-    // Claim the interface.  This step is needed before any I/Os can be
-    // issued to the USB device.
-    if (libusb_claim_interface(dev, 0) !=0){
-        perror("Cannot claim interface");
-    }
     
     //Allocate isochronous transfer
-    iso = libusb_alloc_transfer(1);
-    if(!iso){
-        return -1;
-    }
+    iso = SetupIsoTransfer(dev, EP1, buffer, 1, ReadBufferData, &check);
     
-    //Setup Isochronous transfer
-    libusb_fill_iso_transfer(
-                             iso,             //Transfer Handle
-                             dev,             //Device Handle
-                             EP1,             //Incoming EndPoint
-                             buffer,          //Buffer
-                             PACKET_SIZE,     //Transfer Count
-                             1,               //Number of packets
-                             ReadBufferData,  //Callback Function
-                             &check,          //Data pointer
-                             1000);           //Timeout
-    
-    //Setting packet length
-    libusb_set_iso_packet_lengths(iso, PACKET_SIZE);
     
     int width, height; // Width and height of screen in pixels
     int margin = 10; // Margin spacing around screen
@@ -283,17 +241,8 @@ int main(int argc, char **argv) {
     potScaleFac = height/256;
     int count = 0;
     trigger = 128;
-    printf("Max Packet Size: %d\n", libusb_get_max_iso_packet_size(libusb_get_device(dev), EP1));
     while(1){
-        //Endpoint 1
-        if(libusb_submit_transfer(iso) != 0){
-            perror("Submit");
-            return -1;
-        }
-        while (!check)
-            libusb_handle_events_completed(NULL, NULL);
-        if(check){
-            check = 0;
+        if(GetPacket(dev, iso, EP1, NULL, &check, LIBUSB_TRANSFER_TYPE_ISOCHRONOUS)){
             if(!trigFlag && !freeRun){
                 if(FindTrigger()){
                     trigFlag = 1;
@@ -301,10 +250,11 @@ int main(int argc, char **argv) {
                 }
             }
         }
+        else{
+            return 0;
+        }
         
-        
-        return_val = libusb_interrupt_transfer(dev, (0x03| 0x80), potReading, 2, &rcvd_bytes, 0);
-        if(return_val != 0){
+        if(!GetPacket(dev, NULL, EP3, potReading, NULL, LIBUSB_TRANSFER_TYPE_INTERRUPT)){
             perror("Recieve 3");
             return -1;
         }
