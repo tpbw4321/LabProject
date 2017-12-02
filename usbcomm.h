@@ -19,6 +19,6 @@ struct libusb_device_handle * SetupDevHandle(const int venId, const int devId);
 struct libusb_transfer * SetupIsoTransfer(libusb_device_handle * dev, int endPoint, unsigned char * dataBuffer, int numOfPackets, libusb_transfer_cb_fn callback, void * dataPtr );
 
 //Grabs Iso Packet from transfer
-int GetPacket(libusb_device_handle * dev, struct libusb_transfer * iso, int endPoint ,unsigned char * dataBuffer, int * dataPtr, enum libusb_transfer_type type );
+int PacketTransfer(libusb_device_handle * dev, struct libusb_transfer * iso, int endPoint ,unsigned char * dataBuffer, int * dataPtr, enum libusb_transfer_type type );
 
 #endif /* usbcomm_h */

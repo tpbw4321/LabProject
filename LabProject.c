@@ -12,7 +12,7 @@
 #include "queue.h"
 
 #define PACKET_SIZE 500
-#define SAMP_SIZE   80
+#define SAMP_SIZE   100
 #define BUFFER_SIZE 2000
 #define SAMPLE_RATE 100000
 
@@ -20,6 +20,7 @@
 #define EP1 (0x80|0x01)
 #define EP2 (0x80|0x02)
 #define EP3 (0x80|0x03)
+#define EP4 (0x00|0x04)
 static unsigned char buffer[PACKET_SIZE];   //Transfer Buffer
 static struct libusb_transfer * iso = NULL; //Isochronous Transfer Handler
 static libusb_device_handle * dev = NULL;   //USB Device Handler
@@ -193,6 +194,8 @@ static void LIBUSB_CALL ReadBufferData(struct libusb_transfer *transfer){
     }
     else{
         perror("Failed");
+        *(int *)transfer->user_data = -1;
+        
     }
 }
 
@@ -234,15 +237,36 @@ int main(int argc, char **argv) {
     
     int return_val;
     
-    int rcvd_bytes;
-    int potScaleFac = 0;
+    int sent_bytes = 0;
+    int potScaleFac = height/256;
     int buffLoad = 0;
     
-    potScaleFac = height/256;
     int count = 0;
+    char period[8];
     trigger = 128;
+    
+    for(int i = 0; i < 8; i++){
+        period[i] = 0;
+    }
+    
+    period[2] = 1;
+    period[3] = 100;
+
+
+       /*libusb_bulk_transfer( dev, // Handle for the USB device
+                             EP4, // Address of the Endpoint in USB device
+                             period, // address of data block to transmit
+                             8, // Size of data block
+                             &sent_bytes, // Number of bytes actually sent
+                             0 // Timeout in milliseconds (0 to disable timeout)
+                             );*/
+    
+    libusb_interrupt_transfer(dev, EP4, period, 8, &sent_bytes, 0);
+
+
+    
     while(1){
-        if(GetPacket(dev, iso, EP1, NULL, &check, LIBUSB_TRANSFER_TYPE_ISOCHRONOUS)){
+        if(PacketTransfer(dev, iso, EP1, NULL, &check, LIBUSB_TRANSFER_TYPE_ISOCHRONOUS)){
             if(!trigFlag && !freeRun){
                 if(FindTrigger()){
                     trigFlag = 1;
@@ -250,11 +274,8 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        else{
-            return 0;
-        }
         
-        if(!GetPacket(dev, NULL, EP3, potReading, NULL, LIBUSB_TRANSFER_TYPE_INTERRUPT)){
+        if(!PacketTransfer(dev, NULL, EP3, potReading, NULL, LIBUSB_TRANSFER_TYPE_INTERRUPT)){
             perror("Recieve 3");
             return -1;
         }
@@ -278,7 +299,7 @@ int main(int argc, char **argv) {
             buffLoad = 0;
         }
         End();
-        
+
     }
     
     

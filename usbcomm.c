@@ -73,7 +73,7 @@ struct libusb_transfer * SetupIsoTransfer(libusb_device_handle * dev, int endPoi
 }
 
 //Grabs Packet from transfer returns number of bytes recieved
-int GetPacket(libusb_device_handle * dev, struct libusb_transfer * iso, int endPoint ,unsigned char * dataBuffer, int * isoDataPtr, enum libusb_transfer_type type ){
+int PacketTransfer(libusb_device_handle * dev, struct libusb_transfer * iso, int endPoint ,unsigned char * dataBuffer, int * isoDataPtr, enum libusb_transfer_type type ){
     
     libusb_device * libDev;
     int rcvd_bytes = 0;
