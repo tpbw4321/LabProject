@@ -88,11 +88,11 @@ int PacketTransfer(libusb_device_handle * dev, struct libusb_transfer * iso, int
                 perror("Submit");
                 return 0;
             }
-            while (!(*isoDataPtr))
+            while (!(*isoDataPtr)){
                 libusb_handle_events_completed(NULL, NULL);
+            }
             rcvd_bytes = *isoDataPtr;
             *isoDataPtr = 0;
-            printf("finish");
             break;
         case LIBUSB_TRANSFER_TYPE_INTERRUPT:
             if(libusb_interrupt_transfer(dev, endPoint, dataBuffer, packetSize, &rcvd_bytes, 0) != 0)

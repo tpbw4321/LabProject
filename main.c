@@ -26,8 +26,8 @@
 #define EP4 (0x00|0x04)
 #define PACKET_SIZE 500                     //Ischronous Packet Size
 #define BUFFER_SIZE 2000
-#define PFLAG 2
-#define PERIOD 3
+#define PFLAG 0
+#define PERIOD 1
 
 static int check = 0;
 static argOptions options;
@@ -107,7 +107,7 @@ int main(int argc, const char **argv) {
     period[PFLAG]  = 1;
     
     //Send setting to PSOC
-    libusb_interrupt_transfer(dev, EP4, period, 8, &sent_bytes, 0);
+    libusb_interrupt_transfer(dev, EP4, period, 2, &sent_bytes, 0);
     
     
     while(1){

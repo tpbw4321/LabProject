@@ -130,32 +130,34 @@ int FindTrigger(queue * rawData, argOptions * args){
     trigger = args->trigger;
     trigSlope = args->trigSlope;
     
-    previous = *(char *) rawData->head->item;
-    
-    while(rawData->count > 0){
-        if(rawData->head->prev){
-            current  = *(char *) rawData->head->prev->item;
-            if(trigSlope){
-                if(previous < trigger && current > trigger){
-                    return 1;
+    if(rawData->head){
+        previous = *(char *) rawData->head->item;
+        while(rawData->count > 0){
+            if(rawData->head->prev){
+                current  = *(char *) rawData->head->prev->item;
+                if(trigSlope){
+                    if(previous < trigger && current > trigger){
+                        return 1;
+                    }else{
+                        data = Dequeue(rawData);
+                        free(data);
+                        previous = current;
+                    }
                 }else{
-                    data = Dequeue(rawData);
-                    free(data);
-                    previous = current;
-                }
-            }else{
-                if(previous > trigger && current < trigger){
-                    return 1;
-                }else{
-                    data = Dequeue(rawData);
-                    free(data);
-                    previous = current;
+                    if(previous > trigger && current < trigger){
+                        return 1;
+                    }else{
+                        data = Dequeue(rawData);
+                        free(data);
+                        previous = current;
+                    }
                 }
             }
+            else{
+                break;
+            }
         }
-        else{
-            break;
-        }
+        
     }
     printf("Finish");
     return 0;
