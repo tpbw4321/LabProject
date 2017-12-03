@@ -120,7 +120,8 @@ void plotWave(queue *processedData, // sample data
         y1 = y2;
     }
 }
-int FindTrigger(queue * rawData, argOptions * args){
+//returns the amount of samples removed
+int FindTrigger(queue * triggerChan, queue * otherChan, argOptions * args){
     char current = NULL;
     char previous = NULL;
     char * data;
@@ -130,16 +131,19 @@ int FindTrigger(queue * rawData, argOptions * args){
     trigger = args->trigger;
     trigSlope = args->trigSlope;
     
-    if(rawData->head){
-        previous = *(char *) rawData->head->item;
-        while(rawData->count > 0){
-            if(rawData->head->prev){
-                current  = *(char *) rawData->head->prev->item;
+    
+    if(triggerChan->head){
+        previous = *(char *) triggerChan->head->item;
+        while(triggerChan->count > 0){
+            if(triggerChan->head->prev){
+                current  = *(char *) triggerChan->head->prev->item;
                 if(trigSlope){
                     if(previous < trigger && current > trigger){
                         return 1;
                     }else{
-                        data = Dequeue(rawData);
+                        data = Dequeue(triggerChan);
+                        free(data);
+                        data = Dequeue(otherChan);
                         free(data);
                         previous = current;
                     }
@@ -147,7 +151,9 @@ int FindTrigger(queue * rawData, argOptions * args){
                     if(previous > trigger && current < trigger){
                         return 1;
                     }else{
-                        data = Dequeue(rawData);
+                        data = Dequeue(triggerChan);
+                        free(data);
+                        data = Dequeue(otherChan);
                         free(data);
                         previous = current;
                     }

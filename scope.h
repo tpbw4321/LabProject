@@ -41,7 +41,7 @@ void plotWave(queue *processedData, // sample data
 );
 
 
-int FindTrigger(queue * rawData, argOptions * args);
+int FindTrigger(queue * triggerChan, queue * otherChan, argOptions * args);
 
 #endif
 
