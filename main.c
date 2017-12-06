@@ -157,7 +157,7 @@ int main(int argc, const char **argv) {
         
         Start(width, height);
         drawBackground(width, height, xdivisions, ydivisions, margin);
-        printScaleSettings(xscale, yscale, width-300, height-50, textcolor);
+        printScaleSettings(options.xScale.time, options.yScale, width-300, height-50, textcolor);
         
         if(rawDataChannel1.count > BUFFER_SIZE){
             buffLoad = 1;

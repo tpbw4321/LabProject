@@ -55,15 +55,21 @@ void drawBackground(int w, int h, // width and height of screen
 // Display x and scale settings
 void printScaleSettings(int xscale, int yscale, int xposition, int yposition, VGfloat tcolor[4]) {
     char str[100];
+    int y;
+    
+    y = (yscale * 25)>>4;
     
     setfill(tcolor);
     if (xscale >= 1000)
-        sprintf(str, "X scale = %0d ms/div", xscale/1000);
+        sprintf(str, "X scale = %2d ms/div", xscale/1000);
     else
-        sprintf(str, "X scale = %0d us/div", xscale);
+        sprintf(str, "X scale = %2d us/div", xscale);
     Text(xposition, yposition, str, SansTypeface, 18);
     
-    sprintf(str, "Y scale = %3.2f V/div", yscale * 0.25);
+    if(y >= 1000)
+        sprintf(str, "Y scale = %2d  V/div",  y/1000);
+    else
+        sprintf(str, "Y scale = %2d mV/div",  y);
     Text(xposition, yposition-50, str, SansTypeface, 18);
 }
 

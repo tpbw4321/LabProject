@@ -91,6 +91,7 @@ void SetDefaultOptions(argOptions * options){
     //xScale 1000us
     options->xScale.period = 40;
     options->xScale.samples = 100;
+    options->xScale.time = 1000;
     //yScale 1000mV
     options->yScale = 640;
 }
@@ -142,6 +143,7 @@ int SetTrigChan(int setting, argOptions * options){
 
 //Sets xScale
 int SetXScale(int setting, argOptions * options){
+    options->xScale.time = setting;
     switch(setting){
         case 100:
             options->xScale.period = 5;
@@ -164,7 +166,7 @@ int SetXScale(int setting, argOptions * options){
             options->xScale.samples = 500;
             break;
         case 10000:
-            options->xScale.period = 40;
+            options->xScale.period = 400;
             options->xScale.samples = 100;
             break;
         case 50000:
@@ -177,9 +179,9 @@ int SetXScale(int setting, argOptions * options){
             break;
         default:
             printf("Invalid x-scale Setting - Default Selected\n");
+            options->xScale.time = 1000;
             break;
     }
-    
     return 0;
 }
 

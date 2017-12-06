@@ -18,6 +18,7 @@
 typedef struct xSettings{
     int period;
     int samples;
+    int time;
 }xSettings;
 
 typedef struct argOptions{
