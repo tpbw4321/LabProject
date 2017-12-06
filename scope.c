@@ -171,7 +171,6 @@ int FindTrigger(queue * triggerChan, queue * otherChan, argOptions * args){
         }
         
     }
-    printf("Finish");
     return 0;
 }
 

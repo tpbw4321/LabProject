@@ -88,8 +88,8 @@ int main(int argc, const char **argv) {
     int ydivisions = 8; // Number of y-axis divisions
     char str[100];
     
-    int xscale = 100; // x scale (in units of us)
     int yscale = 8; // y scale (in units of 0.25V)
+    
     VGfloat textcolor[4] = {0, 200, 200, 0.5}; // Color for displaying text
     VGfloat wave1color[4] = {240, 0, 0, 0.5}; // Color for displaying Channel 1 data
     VGfloat wave2color[4] = {200, 200, 0, 0.5}; // Color for displaying Channel 2 data
@@ -106,10 +106,10 @@ int main(int argc, const char **argv) {
     int pixels_per_volt = (ylimit-ystart)*4/(ydivisions*yscale);
     
     int return_val;
-    
     int sent_bytes = 0;
     int potScaleFac = height/256;
     int buffLoad = 0;
+    int sampleBuffer = 0;
     
     
     //Setup USB Device Handler
@@ -124,7 +124,7 @@ int main(int argc, const char **argv) {
     ParseArgs(argc, argv, &options);
     
     DisplayAllSettings(&options);
-    
+    sampleBuffer = options.xScale.samples*10;
     period[PERIOD] = options.xScale.period;
     period[PFLAG]  = 1;
     
@@ -159,7 +159,7 @@ int main(int argc, const char **argv) {
         drawBackground(width, height, xdivisions, ydivisions, margin);
         printScaleSettings(options.xScale.time, options.yScale, width-300, height-50, textcolor);
         
-        if(rawDataChannel1.count > BUFFER_SIZE){
+        if(rawDataChannel1.count > sampleBuffer){
             buffLoad = 1;
         }
         
