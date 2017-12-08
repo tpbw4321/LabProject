@@ -89,8 +89,8 @@ void SetDefaultOptions(argOptions * options){
     //Trigger slope pos
     options->trigSlope = 1;
     //xScale 1000us
-    options->xScale.period = 5;
-    options->xScale.samples = 200;
+    options->xScale.period = 40;
+    options->xScale.samples = 250;
     options->xScale.time = 1000;
     //yScale 1000mV
     options->yScale = 640;
@@ -147,30 +147,30 @@ int SetXScale(int setting, argOptions * options){
     switch(setting){
         case 100:
             options->xScale.period = 5;
-            options->xScale.samples = 80;
+            options->xScale.samples = 167;
             break;
         case 500:
             options->xScale.period = 5;
-            options->xScale.samples = 100;
+            options->xScale.samples = 833;
             break;
         case 1000:
-            options->xScale.period = 5;
-            options->xScale.samples = 200;
+            options->xScale.period = 40;
+            options->xScale.samples = 250;
             break;
         case 2000:
-            options->xScale.period = 5;
-            options->xScale.samples = 400;
-            break;
-        case 5000:
-            options->xScale.period = 5;
+            options->xScale.period = 20;
             options->xScale.samples = 1000;
             break;
+        case 5000:
+            options->xScale.period = 80;
+            options->xScale.samples = 625;
+            break;
         case 10000:
-            options->xScale.period = 100;
-            options->xScale.samples = 100;
+            options->xScale.period = 160;
+            options->xScale.samples = 625;
             break;
         case 50000:
-            options->xScale.period = 100;
+            options->xScale.period = 200;
             options->xScale.samples = 500;
             break;
         case 100000:

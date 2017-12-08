@@ -88,7 +88,7 @@ void processSamples(queue *rawData,  // sample data
     for (int i=0; i< nsamples; i++){
         data = (char*)Dequeue(rawData);
         p = (data_point *) malloc(sizeof(data_point));
-        x1 = xstart + (xfinish-xstart)*i/nsamples;
+        x1 = xstart + (xfinish-xstart)*i/(nsamples-1);
         y1 = *data * 5 * yscale * 5/yScaleDivisor;
         p->x = x1;
         p->y = y1;

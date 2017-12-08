@@ -25,7 +25,7 @@
 #define EP3 (0x80|0x03)
 #define EP4 (0x00|0x04)
 #define PACKET_SIZE 500                     //Ischronous Packet Size
-#define BUFFER_SIZE 1000
+#define BUFFER_SIZE 10000
 #define PFLAG 0
 #define PERIOD 1
 
@@ -34,7 +34,7 @@ static argOptions options;
 static struct libusb_transfer * isoChan1 = NULL; //Isochronous Transfer Handler
 static struct libusb_transfer * isoChan2 = NULL; //Isochronous Transfer Handler
 static libusb_device_handle * dev = NULL;   //USB Device Handler
-static unsigned char buffer[PACKET_SIZE];   //Transfer Buffer
+static unsigned char buffer[BUFFER_SIZE];   //Transfer Buffer
 static queue rawDataChannel1;               //Data from PSOC
 static queue rawDataChannel2;
 static queue processedDataChannel1;         //Data converted data_points
@@ -57,7 +57,7 @@ static void LIBUSB_CALL ReadBuffer1Data(struct libusb_transfer *transfer){
         }
     }
     else{
-        perror("Failed");
+        //perror("Failed");
         *(int *)transfer->user_data = -1;
         
     }
@@ -74,7 +74,7 @@ static void LIBUSB_CALL ReadBuffer2Data(struct libusb_transfer *transfer){
         }
     }
     else{
-        perror("Failed");
+        //perror("Failed");
         *(int *)transfer->user_data = -1;
         
     }
@@ -96,7 +96,7 @@ int main(int argc, const char **argv) {
     
     saveterm(); // Save current screen
     init(&width, &height); // Initialize display and get width and height
-    
+    printf("%d", width);
     int xstart = margin;
     int xlimit = width - 2*margin;
     int ystart = margin;
@@ -166,9 +166,9 @@ int main(int argc, const char **argv) {
         
         if(rawDataChannel1.count >= options.xScale.samples && buffLoad){
             if(trigFlag || options.mode){
-                processSamples(&rawDataChannel1, options.xScale.samples, margin, width, pixels_per_volt,options.yScale, &processedDataChannel1);
-                processSamples(&rawDataChannel2, options.xScale.samples, margin, width, pixels_per_volt,options.yScale, &processedDataChannel2);
-                plotWave(&processedDataChannel1, options.xScale.samples, margin+(potReading[0]*potScaleFac), wave1color);
+                processSamples(&rawDataChannel1, options.xScale.samples, margin, width-2*margin, pixels_per_volt,options.yScale, &processedDataChannel1);
+                processSamples(&rawDataChannel2, options.xScale.samples, margin, width-2*margin, pixels_per_volt,options.yScale, &processedDataChannel2);
+                plotWave(&processedDataChannel1, options.xScale.samples, margin+((255-potReading[0])*potScaleFac), wave1color);
                 plotWave(&processedDataChannel2, options.xScale.samples, margin+(potReading[1]*potScaleFac), wave2color);
                 trigFlag = 0;
             }
