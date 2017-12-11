@@ -124,7 +124,7 @@ int main(int argc, const char **argv) {
     ParseArgs(argc, argv, &options);
     
     DisplayAllSettings(&options);
-    sampleBuffer = options.xScale.samples*10;
+    sampleBuffer = options.xScale.samples*5;
     period[PERIOD] = options.xScale.period;
     period[PFLAG]  = 1;
     

@@ -61,7 +61,7 @@ struct libusb_transfer * SetupIsoTransfer(libusb_device_handle * dev, int endPoi
                              dev,             //Device Handle
                              endPoint,        //Incoming EndPoint
                              dataBuffer,      //Buffer
-                             10000,           //Transfer Count
+                             500,           //Transfer Count
                              1,               //Number of packets
                              CallBack,        //Callback Function
                              dataPtr,         //Data pointer
